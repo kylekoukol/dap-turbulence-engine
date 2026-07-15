@@ -23,6 +23,23 @@ def _first(d, *keys, default=None):
     return default
 
 
+def _coerce_ft(v):
+    """Coerce a messy AWC altitude value to integer feet (or None).
+
+    Handles ints, 'FL240', '24000', and bare flight-level-ish numbers.
+    """
+    if v is None or v == "":
+        return None
+    s = str(v).upper().strip()
+    digits = "".join(ch for ch in s if ch.isdigit())
+    if not digits:
+        return None
+    n = int(digits)
+    if "FL" in s or n <= 600:  # flight level (hundreds of feet)
+        return n * 100
+    return n  # already feet
+
+
 def _to_iso(v):
     if v is None:
         return None
@@ -97,8 +114,8 @@ def fetch_sigmets():
                 {
                     "hazard": hazard or "TURB",
                     "geometry": geom,
-                    "fl_lo": _first(o, "altitudeLow1", "altitudeLow", "minFt", "base"),
-                    "fl_hi": _first(o, "altitudeHi1", "altitudeHi", "maxFt", "top"),
+                    "fl_lo": _coerce_ft(_first(o, "altitudeLow1", "altitudeLow", "minFt", "base")),
+                    "fl_hi": _coerce_ft(_first(o, "altitudeHi1", "altitudeHi", "maxFt", "top")),
                     "valid_from": _to_iso(_first(o, "validTimeFrom", "validTimeFromISO", "issueTime")),
                     "valid_to": _to_iso(_first(o, "validTimeTo", "validTimeToISO", "expireTime")),
                     "raw_text": _first(o, "rawAirSigmet", "raw_text", "rawSigmet", "rawOb", default=""),
@@ -128,7 +145,7 @@ def fetch_pireps(age_hours=3):
             {
                 "lat": float(lat),
                 "lon": float(lon),
-                "altitude_ft": _first(o, "fltLvl", "altitude_ft", "fltlvl", "altitude"),
+                "altitude_ft": _coerce_ft(_first(o, "fltLvl", "altitude_ft", "fltlvl", "altitude")),
                 "intensity": str(intensity) if intensity is not None else None,
                 "observed_at": _to_iso(_first(o, "obsTime", "receiptTime", "reportTime")),
                 "raw_text": _first(o, "rawOb", "raw_text", "report", default=""),
