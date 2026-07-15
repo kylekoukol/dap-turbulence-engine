@@ -84,7 +84,14 @@ AWC_GAIRMET_URL = "https://aviationweather.gov/api/data/gairmet"
 OURAIRPORTS_CSV = "https://davidmegginson.github.io/ourairports-data/airports.csv"
 
 # ---------------------------------------------------------------------------
-# Supabase data contract (the seam)
+# Ingest endpoint (the write seam)
+# ---------------------------------------------------------------------------
+# Lovable Cloud does not expose a service-role key, so the engine POSTs its
+# artifacts (gzipped) to a secured app route which writes them to Supabase
+# Storage + tables server-side. Configured via env:
+#   INGEST_URL     full URL of the ingest route (not secret; e.g. https://app/api/ingest)
+#   INGEST_SECRET  shared secret (GitHub Actions Secret <-> app secret)
+# The storage layout the route writes to (for reference):
 # ---------------------------------------------------------------------------
 BUCKET_CONTOURS = "turbulence-contours"
 BUCKET_GRIDS = "turbulence-grids"

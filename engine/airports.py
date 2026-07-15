@@ -9,7 +9,7 @@ import logging
 
 import config
 from engine.httputil import get
-from engine import supabase_io
+from engine import ingest_client
 
 log = logging.getLogger("engine.airports")
 
@@ -45,14 +45,9 @@ def fetch_airports():
     return rows
 
 
-def seed_if_needed(force=False):
-    try:
-        n = supabase_io.count_rows("airports")
-    except Exception as e:
-        log.warning("Could not count airports (%s); attempting seed anyway", e)
-        n = 0
-    if n > 500 and not force:
-        log.info("airports already populated (%d rows) — skipping seed", n)
-        return n
+def seed():
+    """Fetch OurAirports and upsert into the airports table via the ingest route."""
     rows = fetch_airports()
-    return supabase_io.upsert_rows("airports", rows, on_conflict="icao")
+    ingest_client.upsert_table("airports", rows, on_conflict="icao")
+    log.info("Seeded %d airports", len(rows))
+    return len(rows)

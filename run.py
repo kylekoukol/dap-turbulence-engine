@@ -31,7 +31,7 @@ from engine import (
     contour,
     backups,
     airports,
-    supabase_io,
+    ingest_client,
 )
 
 logging.basicConfig(
@@ -81,11 +81,7 @@ def build_turbulence(cycle):
         raise RuntimeError("No turbulence data produced for any forecast hour.")
     log.info("Stored forecast hours: %s", stored_hours)
 
-    supabase_io.ensure_bucket(config.BUCKET_GRIDS, public=True)
-    supabase_io.ensure_bucket(config.BUCKET_CONTOURS, public=True)
-
     levels_out = []
-    archive = config.ARCHIVE_PREFIX_TEMPLATE.format(cycle_utc=cycle["cycle_utc"].replace(":", ""))
     for fl in config.FLIGHT_LEVELS:
         slices = per_level[fl]
         if not slices:
@@ -103,37 +99,23 @@ def build_turbulence(cycle):
                     contour.band_features(g, extra_props={"forecastHour": h, "level": fl})
                 )
         stackarr = np.ascontiguousarray(np.stack(stack), dtype="<f4")
-        grid_path = config.GRID_OBJECT_TEMPLATE.format(level=fl)
-        fc = contour.features_to_fc(feats)
-        contour_path = config.CONTOUR_OBJECT_TEMPLATE.format(level=fl)
-
-        supabase_io.upload(config.BUCKET_GRIDS, grid_path, stackarr.tobytes(),
-                           "application/octet-stream")
-        supabase_io.upload(config.BUCKET_CONTOURS, contour_path, fc,
-                           "application/geo+json")
-        # timestamped archive copies
-        supabase_io.upload(config.BUCKET_GRIDS, archive + f"grid_FL{fl}.bin",
-                           stackarr.tobytes(), "application/octet-stream")
-        supabase_io.upload(config.BUCKET_CONTOURS, archive + f"contours_FL{fl}.geojson",
-                           fc, "application/geo+json")
+        ingest_client.put_grid(fl, stackarr.tobytes())
+        ingest_client.put_contours(fl, contour.features_to_fc(feats))
 
     manifest = gridmod.build_manifest(cycle["cycle_utc"], stored_hours, levels_out, axes)
     manifest["generated_utc"] = datetime.now(timezone.utc).isoformat()
-    supabase_io.upload(config.BUCKET_GRIDS, config.MANIFEST_OBJECT, manifest,
-                       "application/json")
-    supabase_io.upload(config.BUCKET_GRIDS, archive + "manifest.json", manifest,
-                       "application/json")
+    ingest_client.put_manifest(manifest)
     log.info("Turbulence outputs written for levels %s", levels_out)
     return manifest
 
 
 def refresh_backups():
     try:
-        supabase_io.replace_table("sigmets", backups.fetch_sigmets())
+        ingest_client.replace_table("sigmets", backups.fetch_sigmets())
     except Exception as e:
         log.error("SIGMET refresh failed: %s", e)
     try:
-        supabase_io.replace_table("pireps", backups.fetch_pireps())
+        ingest_client.replace_table("pireps", backups.fetch_pireps())
     except Exception as e:
         log.error("PIREP refresh failed: %s", e)
 
@@ -142,12 +124,13 @@ def main():
     started = datetime.now(timezone.utc)
     log.info("=== DAP turbulence engine run @ %s ===", started.isoformat())
 
-    # airports seed first (cheap, idempotent) so the app has them even if the
-    # GTG step has a bad cycle.
-    try:
-        airports.seed_if_needed()
-    except Exception as e:
-        log.error("Airport seed failed: %s", e)
+    # Airports are seeded once (out-of-band or via SEED_AIRPORTS=1), not every
+    # hour — they don't change. Set SEED_AIRPORTS=1 to (re)seed from OurAirports.
+    if os.environ.get("SEED_AIRPORTS") == "1":
+        try:
+            airports.seed()
+        except Exception as e:
+            log.error("Airport seed failed: %s", e)
 
     cycle = discover.latest_cycle(need_hours=config.STORE_FORECAST_HOURS)
     log.info("Using cycle %s (dir %s)", cycle["cycle_utc"], cycle["dir_url"])

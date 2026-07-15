@@ -51,26 +51,31 @@ Locally (needs `libeccodes-dev` installed):
 
 ```bash
 pip install -r requirements.txt
-export SUPABASE_URL=https://YOURPROJECT.supabase.co
-export SUPABASE_SERVICE_ROLE_KEY=...           # service role, server-side only
-python run.py
+export INGEST_URL=https://<app>/api/ingest    # the app's secured ingest route
+export INGEST_SECRET=...                       # shared secret
+python run.py                                   # add SEED_AIRPORTS=1 once to seed airports
 ```
 
 In CI: `.github/workflows/refresh.yml` runs hourly (`8 * * * *`) and on demand
-(`workflow_dispatch`). It reads `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
-from **Actions Secrets**. No secrets live in code.
+(`workflow_dispatch`). It reads `INGEST_URL` and `INGEST_SECRET` from **Actions
+Secrets**. No secrets live in code.
 
-## Supabase contract (the seam)
+## The write seam (why an ingest endpoint)
 
-Storage:
-- `turbulence-contours/latest/contours_FL{level}.geojson` — map blobs (features
-  tagged with `forecastHour` + `level`).
-- `turbulence-grids/latest/grid_FL{level}.bin` — Float32 EDR grid **stack**
-  (`[forecast_hour][lat][lon]`, little-endian).
-- `turbulence-grids/latest/manifest.json` — cycle, bounds, shape, levels,
-  forecast hours, byte layout.
+Lovable Cloud does not expose a service-role key, so the engine cannot write to
+Supabase directly. Instead it POSTs gzipped artifacts to a secured app route
+(`/api/ingest`) that holds the admin credentials and writes them server-side.
+Ingest requests carry `x-ingest-secret` and `x-ingest-kind`
+(`grid|contours|manifest|table`), plus `x-ingest-level` or `x-ingest-table`.
 
-Tables: `sigmets`, `pireps`, `airports` (see the app's migration for columns).
+What ends up in Supabase (the read seam the app + a future iOS app consume):
+- Storage `turbulence-contours/latest/contours_FL{level}.geojson` — map blobs
+  (features tagged with `forecastHour` + `level`).
+- Storage `turbulence-grids/latest/grid_FL{level}.bin` — Float32 EDR grid
+  **stack** (`[forecast_hour][lat][lon]`, little-endian).
+- Storage `turbulence-grids/latest/manifest.json` — cycle, bounds, shape,
+  levels, forecast hours, byte layout.
+- Tables `sigmets`, `pireps`, `airports`.
 
 ## Coverage
 
