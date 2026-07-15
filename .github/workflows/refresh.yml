@@ -1,0 +1,42 @@
+name: Refresh turbulence data
+
+# Hourly, a few minutes after the top of the hour to let NCEP finish posting a
+# cycle. Also runnable on demand (used to seed the first cycle during the build).
+on:
+  schedule:
+    - cron: "8 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: turbulence-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install eccodes (GRIB2 decoder backend)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libeccodes-dev libeccodes-tools
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run turbulence pipeline
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python run.py

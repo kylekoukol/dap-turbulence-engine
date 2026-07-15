@@ -1,0 +1,9 @@
+# DAP Turbulence Engine — Python dependencies
+requests>=2.31.0
+numpy>=1.26.0
+scipy>=1.11.0
+pygrib>=2.1.5
+pyproj>=3.6.0
+matplotlib>=3.8.0
+geojsoncontour>=0.4.0
+python-dateutil>=2.9.0

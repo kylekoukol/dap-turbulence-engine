@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+
+# Working / output scratch
+/tmp_out/
+/_scratch/
+*.grib2
+*.grib2.idx
+*.bin
+out/
+
+# OS
+.DS_Store
