@@ -17,7 +17,7 @@ SEVERITY = {
         "score": 0,
     },
     "light": {
-        "passenger": "A few light bumps — completely normal",
+        "passenger": "A few light bumps, completely normal",
         "map_color": "#A6D6B0",   # soft green
         "fill_opacity": 0.30,
         "line_color": "#8CC79A",
@@ -25,7 +25,7 @@ SEVERITY = {
         "score": 1,
     },
     "moderate": {
-        "passenger": "Some noticeable bumps — normal and safe",
+        "passenger": "Some noticeable bumps, normal and safe",
         "map_color": "#EBCB86",   # soft amber
         "fill_opacity": 0.34,
         "line_color": "#DDB868",
@@ -33,7 +33,7 @@ SEVERITY = {
         "score": 2,
     },
     "severe": {
-        "passenger": "A bumpy stretch — the crew plans around these",
+        "passenger": "A bumpy stretch the crew plans around",
         "map_color": "#DDA277",   # muted orange (never bright red)
         "fill_opacity": 0.38,
         "line_color": "#CE8F60",
@@ -41,7 +41,7 @@ SEVERITY = {
         "score": 3,
     },
     "extreme": {
-        "passenger": "A rough patch (rare) — pilots actively avoid these",
+        "passenger": "A rough patch (rare) that pilots actively avoid",
         "map_color": "#B57F6E",   # muted red-brown
         "fill_opacity": 0.42,
         "line_color": "#A66E5D",
