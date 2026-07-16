@@ -25,15 +25,14 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Install eccodes (GRIB2 decoder backend)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libeccodes-dev libeccodes-tools
-
+      # NOTE: do NOT apt-install eccodes here. The pygrib wheel bundles its own
+      # eccodes; a second system copy conflicts and crashes the decoder on the
+      # first real GRIB file. The wheel is self-contained.
       - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          python -c "import pygrib; print('pygrib', pygrib.__version__, 'ready')"
 
       - name: Run turbulence pipeline
         env:
