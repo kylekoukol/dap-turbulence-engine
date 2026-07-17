@@ -1,0 +1,43 @@
+name: Publish pillar pages
+
+# Pillars are evergreen. They publish on first deploy and whenever their content
+# changes (push to the generator), plus a monthly run to bump the reviewed date
+# for freshness. Also runnable on demand.
+on:
+  schedule:
+    - cron: "40 13 1 * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "generate_pillars.py"
+      - ".github/workflows/pillars.yml"
+
+concurrency:
+  group: pillar-pages
+  cancel-in-progress: false
+
+jobs:
+  pillars:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Publish pillar pages
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://dap-turbulence.lovable.app' }}
+          INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
+        run: python generate_pillars.py
