@@ -25,9 +25,9 @@ BOOKING = "https://calendly.com/dialapilotschedule/dial-a-pilot-briefing"
 CORRIDORS = [
     ("Over the Rockies", "over-the-rockies", "Rocky Mountains", "DEN", "SFO",
      "the Rocky Mountains between Denver and the West Coast"),
-    ("Transcontinental (Los Angeles to New York)", "transcontinental-la-to-new-york",
+    ("Los Angeles to New York", "transcontinental-la-to-new-york",
      "Coast to coast", "LAX", "JFK", "the transcontinental route between Los Angeles and New York"),
-    ("Transcontinental (San Francisco to New York)", "transcontinental-sf-to-new-york",
+    ("San Francisco to New York", "transcontinental-sf-to-new-york",
      "Coast to coast", "SFO", "JFK", "the northern transcon between San Francisco and New York"),
     ("Chicago to the Northeast", "chicago-to-the-northeast", "Midwest to Northeast",
      "ORD", "LGA", "the busy corridor between Chicago and the Northeast"),
@@ -89,9 +89,9 @@ def build_page(name, slug, region, o, d, phrase, j, day):
     title = f"Will your {name} flight be bumpy? Turbulence forecast for {date_str}"
     meta = (f"{summary} A calm, plain-language turbulence forecast for {phrase}, "
             f"from real airline pilots. Updated {date_str}.")
-    headline = f"Will your {name.lower()} flight be bumpy today?"
+    headline = f"{name}: Will your flight be bumpy today?"
     body = f"""<p class="lead">{summary}</p>
-<p>This is a plain-language read on {phrase} for {date_str}. It is built from the same turbulence forecast data pilots use in the flight deck (NOAA's GTG model) and translated by real airline pilots into what you will actually feel in your seat.</p>
+<p>This is a plain-language read on {phrase} for {date_str}. It is built from the same turbulence forecast data pilots use in the flight deck (NOAA's GTG model), read through a plain-language scale our airline pilots designed so you know what you will actually feel in your seat.</p>
 <p>{ov.get('headline','')}</p>
 {pirep_html}
 {cov_html}
@@ -102,7 +102,7 @@ def build_page(name, slug, region, o, d, phrase, j, day):
 <p><a href="{APP}/">Check your flight</a>, or <a href="{BOOKING}" target="_blank" rel="noopener">talk to a real airline pilot one on one</a> before you go.</p>"""
 
     faq = [
-        {"q": f"Is it bumpy over {name.lower()} today?", "a": summary},
+        {"q": f"Is it bumpy flying {name} today?", "a": summary},
         {"q": "Is turbulence dangerous?",
          "a": "No. Turbulence is uncomfortable but routine. Modern aircraft are engineered to handle far more than they ever encounter, and pilots plan their route to avoid the roughest air."},
         {"q": "How accurate is this turbulence forecast?",
