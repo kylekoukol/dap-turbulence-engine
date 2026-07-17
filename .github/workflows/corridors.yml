@@ -7,6 +7,13 @@ on:
   schedule:
     - cron: "20 13 * * *"
   workflow_dispatch:
+  # Also regenerate when the corridor logic itself changes (and self-seeds on
+  # first deploy). Scoped to these files so ordinary engine commits don't fire.
+  push:
+    branches: [main]
+    paths:
+      - "generate_corridors.py"
+      - ".github/workflows/corridors.yml"
 
 concurrency:
   group: corridor-pages
