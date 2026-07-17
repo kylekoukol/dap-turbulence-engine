@@ -1,0 +1,40 @@
+name: Daily corridor pages
+
+# Once a day, mid-morning UTC, after several NOAA cycles have posted so the
+# representative forecasts are fresh. Also runnable on demand (used to seed the
+# first batch during the build, and any time you want an immediate refresh).
+on:
+  schedule:
+    - cron: "20 13 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: corridor-pages
+  cancel-in-progress: false
+
+jobs:
+  corridors:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Generate + publish corridor pages
+        env:
+          # Public app base (not secret). Override via repo variable APP_URL if
+          # you move to a custom domain later.
+          APP_URL: ${{ vars.APP_URL || 'https://dap-turbulence.lovable.app' }}
+          INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
+        run: python generate_corridors.py
