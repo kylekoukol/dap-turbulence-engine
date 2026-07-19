@@ -1,0 +1,39 @@
+name: Send day-before forecast emails
+
+# Every few hours, ask the app to process the forecast_requests queue: for any
+# flight that has now come within the forecast horizon, generate the fresh
+# forecast and email it, then mark it sent. The app holds all the logic and the
+# email provider key; this workflow just pokes the secured endpoint on a
+# schedule. Also self-runs on a push to this file (used to fire the first test).
+on:
+  schedule:
+    - cron: "15 */4 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/send-forecasts.yml"
+
+concurrency:
+  group: send-forecasts
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Process the day-before queue
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://dap-turbulence.lovable.app' }}
+          INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
+        run: |
+          echo "Calling send-forecast-emails..."
+          code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" \
+            -X POST "$APP_URL/api/send-forecast-emails" \
+            -H "x-ingest-secret: $INGEST_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          echo "HTTP $code"
+          echo "Response:"; cat /tmp/resp.json; echo
+          test "$code" = "200"
