@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
 """
-Airport conditions collector (the "best times to fly" data moat).
+Airport conditions + raw pilot-report collector (the turbulence data moat).
 
-Every hour, for a set of major US airports, we snapshot the surface weather
-(wind, gusts, thunderstorms) from the METAR and count nearby low-altitude pilot
-turbulence reports, tag each with the airport's LOCAL hour of day, compute a
-transparent bumpiness proxy, and append it to the airport_obs history in
-Supabase (via a secured app ingest route). Over weeks and seasons this builds a
-real, observed picture of which hours are typically smoothest into and out of
-each airport. It is append-only and compounding: every run makes it better.
+Every hour this does two things:
 
-Data integrity notes:
-- METAR fields (wind/gust/wx) are reliable and observed.
-- PIREPs are voluntary and sparse, and skew toward reported bumps; absence of a
-  report does NOT mean smooth air. We store the raw counts/intensities so the
-  score can be recomputed, and the public pages must show sample size and treat
-  thin data honestly.
+1) RAW ARCHIVE (national): pulls every recent US pilot report (PIREP) and stores
+   the full detail of each one, append-only and de-duplicated: severity, the
+   altitude and the base/top of the bumpy layer, location, turbulence type,
+   aircraft, time, and the raw text. This is the compounding asset: it lets us
+   analyze turbulence by altitude, by location, by route, and by airport later,
+   without ever having thrown detail away.
+
+2) AIRPORT AGGREGATE: for a large set of commercially served US airports, it
+   snapshots the surface weather (wind, gusts, thunderstorms) and summarizes the
+   nearby climb/descent pilot reports (within ~80 nm and at or below 20,000 ft,
+   the band a flight climbs and descends through), tagged with the airport's
+   local hour, into the airport_obs history that powers "best times to fly".
+
+Data integrity: PIREPs are voluntary and skew toward reported bumps, so absence
+is not proof of smooth air. We store raw counts and intensities so nothing is
+inferred beyond what was reported, and the public pages show sample size.
 
 Env:
   APP_URL        deployed app base (default https://dap-turbulence.lovable.app)
@@ -24,6 +28,7 @@ Env:
 import os
 import json
 import math
+import hashlib
 import datetime
 import requests
 from zoneinfo import ZoneInfo
@@ -34,36 +39,15 @@ UA = "dap-turbulence-engine/1.0 (+https://dialapilot.com; contact kyle@dialapilo
 
 METAR_URL = "https://aviationweather.gov/api/data/metar"
 PIREP_URL = "https://aviationweather.gov/api/data/pirep"
-CONUS_BBOX = "21,-125,50,-66"
+CONUS_BBOX = "18,-170,72,-64"   # CONUS + Alaska + Hawaii-ish western reach
 
-# iata, icao, lat, lon, IANA timezone. The airports nervous fliers ask about
-# most, plus the major hubs and the known time-of-day / convective / terrain
-# offenders. Easy to extend.
-AIRPORTS = [
-    ("LAS", "KLAS", 36.0801, -115.1522, "America/Los_Angeles"),
-    ("LAX", "KLAX", 33.9416, -118.4085, "America/Los_Angeles"),
-    ("SFO", "KSFO", 37.6213, -122.3790, "America/Los_Angeles"),
-    ("SEA", "KSEA", 47.4502, -122.3088, "America/Los_Angeles"),
-    ("SMF", "KSMF", 38.6954, -121.5908, "America/Los_Angeles"),
-    ("SAN", "KSAN", 32.7336, -117.1897, "America/Los_Angeles"),
-    ("DEN", "KDEN", 39.8561, -104.6737, "America/Denver"),
-    ("SLC", "KSLC", 40.7899, -111.9791, "America/Denver"),
-    ("PHX", "KPHX", 33.4342, -112.0116, "America/Phoenix"),
-    ("DFW", "KDFW", 32.8998, -97.0403, "America/Chicago"),
-    ("IAH", "KIAH", 29.9902, -95.3368, "America/Chicago"),
-    ("ORD", "KORD", 41.9742, -87.9073, "America/Chicago"),
-    ("MSP", "KMSP", 44.8848, -93.2223, "America/Chicago"),
-    ("ATL", "KATL", 33.6407, -84.4277, "America/New_York"),
-    ("MCO", "KMCO", 28.4312, -81.3081, "America/New_York"),
-    ("MIA", "KMIA", 25.7959, -80.2870, "America/New_York"),
-    ("JFK", "KJFK", 40.6413, -73.7781, "America/New_York"),
-    ("LGA", "KLGA", 40.7769, -73.8740, "America/New_York"),
-    ("BOS", "KBOS", 42.3656, -71.0096, "America/New_York"),
-    ("DCA", "KDCA", 38.8512, -77.0402, "America/New_York"),
-]
+# Climb/descent catchment around an airport: a flight is climbing or descending
+# within roughly this radius and altitude band on arrival and departure.
+NEAR_NM = 80.0
+LOW_FL = 200          # <= 20,000 ft (flight level, hundreds of feet)
 
-NEAR_NM = 50.0        # count PIREPs within this radius of the airport
-LOW_FL = 120          # only low-altitude reports (<= 12,000 ft) matter for arr/dep
+HERE = os.path.dirname(os.path.abspath(__file__))
+TARGETS = json.load(open(os.path.join(HERE, "airports_targets.json")))
 
 
 def haversine_nm(lat1, lon1, lat2, lon2):
@@ -88,22 +72,34 @@ def intensity_score(s):
     return 0
 
 
+def fl_to_ft(v):
+    if isinstance(v, (int, float)):
+        return int(round(v)) * 100
+    return None
+
+
 def fetch_metars(icaos):
-    r = requests.get(METAR_URL, params={"ids": ",".join(icaos), "format": "json"},
-                     headers={"User-Agent": UA}, timeout=60)
-    r.raise_for_status()
+    """Fetch METARs in batches (the ids list can be long)."""
     out = {}
-    for m in r.json():
-        code = m.get("icaoId")
-        if code:
-            out[code] = m
+    for i in range(0, len(icaos), 100):
+        batch = icaos[i:i + 100]
+        try:
+            r = requests.get(METAR_URL, params={"ids": ",".join(batch), "format": "json"},
+                             headers={"User-Agent": UA}, timeout=60)
+            r.raise_for_status()
+            for m in r.json():
+                code = m.get("icaoId")
+                if code:
+                    out[code] = m
+        except Exception as e:
+            print(f"metar batch {i} failed (non-fatal): {e}")
     return out
 
 
 def fetch_pireps():
     try:
         r = requests.get(PIREP_URL, params={"format": "json", "age": 2, "bbox": CONUS_BBOX},
-                         headers={"User-Agent": UA}, timeout=60)
+                         headers={"User-Agent": UA}, timeout=90)
         r.raise_for_status()
         data = r.json()
         return data if isinstance(data, list) else []
@@ -112,26 +108,36 @@ def fetch_pireps():
         return []
 
 
-def nearby_pireps(lat, lon, pireps):
-    count = 0
-    peak = 0
-    for p in pireps:
-        plat, plon = p.get("lat"), p.get("lon")
-        if plat is None or plon is None:
-            continue
-        fl = p.get("fltLvl")
-        if isinstance(fl, (int, float)) and fl > LOW_FL:
-            continue
-        if haversine_nm(lat, lon, plat, plon) > NEAR_NM:
-            continue
-        count += 1
-        peak = max(peak, intensity_score(p.get("tbInt1")), intensity_score(p.get("tbInt2")))
-    return count, peak
+def parse_pirep(p):
+    """Full raw record for the national archive."""
+    raw = p.get("rawOb") or ""
+    obs = p.get("obsTime")
+    if not obs or not raw:
+        return None
+    key = hashlib.sha1(f"{obs}|{raw}".encode("utf-8")).hexdigest()
+    obs_dt = datetime.datetime.fromtimestamp(obs, tz=datetime.timezone.utc)
+    tbi = max(intensity_score(p.get("tbInt1")), intensity_score(p.get("tbInt2")))
+    raw_int = "/".join(x for x in [p.get("tbInt1"), p.get("tbInt2")] if x) or None
+    return {
+        "report_key": key,
+        "obs_time": obs_dt.isoformat().replace("+00:00", "Z"),
+        "lat": p.get("lat"),
+        "lon": p.get("lon"),
+        "altitude_ft": fl_to_ft(p.get("fltLvl")),
+        "tb_base_ft": fl_to_ft(p.get("tbBas1")),
+        "tb_top_ft": fl_to_ft(p.get("tbTop1")),
+        "tb_intensity": tbi,
+        "tb_intensity_raw": raw_int,
+        "tb_type": p.get("tbType1") or None,
+        "icing_raw": p.get("icgInt1") or None,
+        "aircraft": p.get("acType") or None,
+        "wx": p.get("wxString") or None,
+        "station": p.get("icaoId") or None,
+        "raw_ob": raw[:500],
+    }
 
 
 def bumpiness(wind_kt, gust_kt, convective, pirep_max):
-    """Transparent 0-4 proxy from surface weather + nearby reports. Stored
-    alongside the raw fields so it can be recomputed if we tune the formula."""
     score = 0
     if isinstance(wind_kt, (int, float)) and wind_kt >= 20:
         score += 1
@@ -146,52 +152,75 @@ def bumpiness(wind_kt, gust_kt, convective, pirep_max):
     return min(score, 4)
 
 
+def post(path, rows, label):
+    ok = 0
+    for i in range(0, len(rows), 400):
+        batch = rows[i:i + 400]
+        r = requests.post(f"{APP}{path}",
+                          headers={"x-ingest-secret": SECRET, "Content-Type": "application/json"},
+                          data=json.dumps({"rows": batch}), timeout=90)
+        print(f"{label} batch {i}: {r.status_code} {r.text[:120]}")
+        r.raise_for_status()
+        ok += len(batch)
+    return ok
+
+
 def main():
     if not SECRET:
         raise SystemExit("INGEST_SECRET not set")
-    metars = fetch_metars([a[1] for a in AIRPORTS])
-    pireps = fetch_pireps()
-    print(f"metars: {len(metars)}  pireps(conus): {len(pireps)}")
 
-    rows = []
-    for iata, icao, lat, lon, tz in AIRPORTS:
-        m = metars.get(icao)
-        if not m:
-            print(f"{icao}: no METAR, skipping")
+    pireps = fetch_pireps()
+    metars = fetch_metars([a["icao"] for a in TARGETS])
+    print(f"targets: {len(TARGETS)}  metars: {len(metars)}  pireps: {len(pireps)}")
+
+    # 1) Raw national PIREP archive
+    raw_rows = [r for r in (parse_pirep(p) for p in pireps) if r]
+    if raw_rows:
+        post("/api/pirep-reports", raw_rows, "pirep-reports")
+
+    # Pre-filter PIREPs usable for airport climb/descent association (<= FL200).
+    low = []
+    for p in pireps:
+        lat, lon, fl = p.get("lat"), p.get("lon"), p.get("fltLvl")
+        if lat is None or lon is None:
             continue
-        obs_ts = m.get("obsTime")
-        if not obs_ts:
-            print(f"{icao}: no obsTime, skipping")
+        if isinstance(fl, (int, float)) and fl > LOW_FL:
             continue
-        obs_dt = datetime.datetime.fromtimestamp(obs_ts, tz=datetime.timezone.utc)
-        local_hour = obs_dt.astimezone(ZoneInfo(tz)).hour
+        low.append((lat, lon, max(intensity_score(p.get("tbInt1")), intensity_score(p.get("tbInt2")))))
+
+    # 2) Airport-hour aggregate
+    obs_rows = []
+    for a in TARGETS:
+        m = metars.get(a["icao"])
+        if not m or not m.get("obsTime"):
+            continue
+        obs_dt = datetime.datetime.fromtimestamp(m["obsTime"], tz=datetime.timezone.utc)
+        try:
+            local_hour = obs_dt.astimezone(ZoneInfo(a["tz"])).hour
+        except Exception:
+            local_hour = obs_dt.hour
         wind_kt = m.get("wspd")
         gust_kt = m.get("wgst")
         wx = m.get("wxString")
         convective = bool(wx and "TS" in wx.upper())
-        pc, pmax = nearby_pireps(lat, lon, pireps)
-        rows.append({
-            "icao": icao,
-            "iata": iata,
+        pc = 0
+        pmax = 0
+        for lat, lon, inten in low:
+            if haversine_nm(a["lat"], a["lon"], lat, lon) <= NEAR_NM:
+                pc += 1
+                pmax = max(pmax, inten)
+        obs_rows.append({
+            "icao": a["icao"], "iata": a["iata"],
             "observed_at": obs_dt.isoformat().replace("+00:00", "Z"),
             "local_hour": local_hour,
-            "wind_kt": wind_kt,
-            "gust_kt": gust_kt,
-            "wx": wx,
-            "convective": convective,
-            "pirep_count": pc,
-            "pirep_max": pmax,
+            "wind_kt": wind_kt, "gust_kt": gust_kt, "wx": wx, "convective": convective,
+            "pirep_count": pc, "pirep_max": pmax,
             "bumpiness": bumpiness(wind_kt, gust_kt, convective, pmax),
         })
 
-    if not rows:
-        raise SystemExit("no rows built")
-
-    r = requests.post(f"{APP}/api/airport-obs",
-                      headers={"x-ingest-secret": SECRET, "Content-Type": "application/json"},
-                      data=json.dumps({"rows": rows}), timeout=60)
-    print(f"ingest {r.status_code}: {r.text[:200]}")
-    r.raise_for_status()
+    if obs_rows:
+        post("/api/airport-obs", obs_rows, "airport-obs")
+    print(f"done: {len(raw_rows)} raw reports, {len(obs_rows)} airport rows")
 
 
 if __name__ == "__main__":
