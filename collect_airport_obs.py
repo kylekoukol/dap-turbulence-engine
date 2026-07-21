@@ -26,6 +26,7 @@ Env:
   INGEST_SECRET  shared secret (GitHub Actions Secret)
 """
 import os
+import re
 import json
 import math
 import hashlib
@@ -70,6 +71,56 @@ def intensity_score(s):
     if "LGT" in v or v == "LT":
         return 1
     return 0
+
+
+# --- Aircraft classification -------------------------------------------------
+# Turbulence is mass-dependent: a Cessna calls "moderate" what a jet never feels.
+# For the "best times" counting we only count airline-class aircraft (jets,
+# regional jets, mainstream airline turboprops), and airline flight callsigns
+# that show up in the aircraft-type field. Light GA, business jets, and small
+# commuters are classified but NOT counted. The raw archive keeps the class on
+# every report so nothing is lost.
+AIRLINE_ICAO = {
+    "UAL", "AAL", "DAL", "SWA", "ASA", "JBU", "NKS", "FFT", "HAL", "SCX", "AAY",
+    "SKW", "RPA", "ENY", "EDV", "AWI", "QXE", "JIA", "PDT", "MXY", "GJS", "UCA",
+    "CPZ", "UPS", "FDX", "ABX", "GTI", "CKS", "ACA", "WJA", "JZA",
+}
+JET_TYPES = {
+    "B712", "B77W", "B77L", "B772", "B78X", "B788", "B789", "B762", "B763", "B764",
+    "B752", "B753", "B744", "B748", "B722", "B733", "B734", "B735", "B736", "B737",
+    "B738", "B739", "A318", "A319", "A320", "A321", "A19N", "A20N", "A21N", "A332",
+    "A333", "A339", "A342", "A343", "A345", "A346", "A359", "A35K", "A388", "A306",
+    "A310", "BCS1", "BCS3", "MD11", "MD82", "MD83", "MD88", "MD90", "DC10", "B461",
+    "B462", "B463",
+}
+REGIONAL_JET = {
+    "E170", "E75L", "E75S", "E175", "E190", "E195", "E290", "E295", "E135", "E145",
+    "E45X", "ERJ", "CRJ1", "CRJ2", "CRJ7", "CRJ9", "CRJX", "CL65", "F70", "F100",
+}
+AIRLINE_TPROP = {
+    "DH8A", "DH8B", "DH8C", "DH8D", "AT43", "AT45", "AT72", "AT75", "AT76", "SF34", "SB20",
+}
+COUNTED_CLASSES = {"airliner_jet", "regional_jet", "airline_turboprop"}
+
+
+def classify_aircraft(actype):
+    t = (actype or "").upper().strip()
+    if not t:
+        return "unknown"
+    m = re.match(r"^([A-Z]{3})\d+$", t)
+    if m and m.group(1) in AIRLINE_ICAO:
+        return "airliner_jet"
+    if re.match(r"^B7\d\d$", t) or re.match(r"^B3[789]M$", t) or t in JET_TYPES:
+        return "airliner_jet"
+    if re.match(r"^A3\d\d$", t):
+        return "airliner_jet"
+    if t in REGIONAL_JET or t.startswith("CRJ") or re.match(r"^E(17|19|29|75|13|14)\d?[A-Z]?$", t):
+        return "regional_jet"
+    if t in AIRLINE_TPROP:
+        return "airline_turboprop"
+    if re.match(r"^7[0-9]{2}$", t):
+        return "airliner_jet"
+    return "other"
 
 
 def fl_to_ft(v):
@@ -131,6 +182,7 @@ def parse_pirep(p):
         "tb_type": p.get("tbType1") or None,
         "icing_raw": p.get("icgInt1") or None,
         "aircraft": p.get("acType") or None,
+        "aircraft_class": classify_aircraft(p.get("acType")),
         "wx": p.get("wxString") or None,
         "station": p.get("icaoId") or None,
         "raw_ob": raw[:500],
@@ -178,13 +230,17 @@ def main():
     if raw_rows:
         post("/api/pirep-reports", raw_rows, "pirep-reports")
 
-    # Pre-filter PIREPs usable for airport climb/descent association (<= FL200).
+    # Pre-filter PIREPs usable for airport climb/descent association: airline-class
+    # aircraft only (a light GA report is not what an airliner passenger feels),
+    # within the climb/descent altitude band (<= FL200).
     low = []
     for p in pireps:
         lat, lon, fl = p.get("lat"), p.get("lon"), p.get("fltLvl")
         if lat is None or lon is None:
             continue
         if isinstance(fl, (int, float)) and fl > LOW_FL:
+            continue
+        if classify_aircraft(p.get("acType")) not in COUNTED_CLASSES:
             continue
         low.append((lat, lon, max(intensity_score(p.get("tbInt1")), intensity_score(p.get("tbInt2")))))
 
