@@ -33,7 +33,7 @@ SEVERITY = {
         "score": 2,
     },
     "severe": {
-        "passenger": "A bumpy stretch the crew plans around",
+        "passenger": "A bumpier stretch, seatbelt sign likely on",
         "map_color": "#DDA277",   # muted orange (never bright red)
         "fill_opacity": 0.38,
         "line_color": "#CE8F60",
@@ -41,7 +41,7 @@ SEVERITY = {
         "score": 3,
     },
     "extreme": {
-        "passenger": "A rough patch (rare) that pilots actively avoid",
+        "passenger": "A rough patch (rare), everyone stays seated and belted",
         "map_color": "#B57F6E",   # muted red-brown
         "fill_opacity": 0.42,
         "line_color": "#A66E5D",

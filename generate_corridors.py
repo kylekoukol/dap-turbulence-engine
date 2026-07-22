@@ -60,9 +60,9 @@ CORRIDORS = [
 SUMMARY = {
     "smooth": "Today's outlook is smooth. Expect a comfortable, quiet ride.",
     "light": "Today's outlook is mostly smooth with a few light bumps. Completely normal, and nothing to worry about.",
-    "moderate": "Today's outlook is mostly smooth with a bumpier stretch or two. Noticeable, but normal and safe, and the crew plans around the worst of it.",
-    "severe": "Today there is a bumpier patch along the route. It can feel uncomfortable, but it is well within what the aircraft and crew handle every day, and pilots plan around the roughest air.",
-    "extreme": "Today shows a rougher patch along parts of this route. Pilots actively route around this kind of air when they can. It can look dramatic, but the aircraft is built for far more.",
+    "moderate": "Today's outlook is mostly smooth with a bumpier stretch or two. Noticeable, but normal and safe. The crew works to find the smoothest ride and may put the seatbelt sign on and have the flight attendants take their seats.",
+    "severe": "Today there is a bumpier patch along the route. It can feel uncomfortable, but it is well within what the aircraft and crew handle every day. The crew will do their best to find smoother air and will likely keep the seatbelt sign on with the flight attendants seated.",
+    "extreme": "Today shows a rougher patch along parts of this route. The crew looks for smoother air and keeps everyone seated and belted. It can look dramatic, but the aircraft is built for far more.",
 }
 
 
@@ -104,7 +104,7 @@ def build_page(name, slug, region, o, d, phrase, j, day):
     faq = [
         {"q": f"Is it bumpy flying {name} today?", "a": summary},
         {"q": "Is turbulence dangerous?",
-         "a": "No. Turbulence is uncomfortable but routine. Modern aircraft are engineered to handle far more than they ever encounter, and pilots plan their route to avoid the roughest air."},
+         "a": "No. Turbulence is uncomfortable but routine. Modern aircraft are engineered to handle far more than they ever encounter, and pilots use forecasts to find the smoothest ride, though no flight can avoid every bump."},
         {"q": "How accurate is this turbulence forecast?",
          "a": "It is built from NOAA's operational turbulence model, the same data used in the flight deck, and refreshed through the day. It is a forecast, so conditions can shift, but it is a reliable read on what to expect."},
     ]

@@ -122,7 +122,7 @@ P1_FAQ = [
     {"q": "Why does the seat belt sign come on when the air feels smooth?",
      "a": "Because some turbulence cannot be seen, and forecasts and pilot reports let a crew know rough air is likely before you would feel it. The single most effective thing a passenger can do is keep the belt fastened whenever seated, even when the ride is smooth."},
     {"q": "Can pilots avoid turbulence?",
-     "a": "Often, yes. Pilots and airline dispatchers use rapidly updated turbulence forecasts and pilot reports to pick smoother altitudes and routes, and to plan around the roughest air. They cannot make every bump disappear, but the worst of it is usually planned around before you ever board."},
+     "a": "Not entirely, and no honest pilot would claim otherwise. What they can do is use rapidly updated forecasts and reports from aircraft ahead to pick smoother altitudes and routes and find the best ride available. When a bumpy patch cannot be avoided, they turn on the seatbelt sign and have the flight attendants take their seats. The aircraft handles it routinely."},
 ]
 
 # ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ P2_FAQ = [
 # ---------------------------------------------------------------------------
 # Pillar 3: What Causes Turbulence?
 # ---------------------------------------------------------------------------
-P3_BODY = f"""<p class="lead">Turbulence is simply the airplane flying through air that is moving unevenly, and only a handful of things stir the air up. Heat rising off the ground, wind tumbling over mountains, the fast high altitude rivers of air called jet streams, and the wake of other aircraft. None of them mean anything is wrong with the airplane, and all of them are things pilots forecast and plan around every day.</p>
+P3_BODY = f"""<p class="lead">Turbulence is simply the airplane flying through air that is moving unevenly, and only a handful of things stir the air up. Heat rising off the ground, wind tumbling over mountains, the fast high altitude rivers of air called jet streams, and the wake of other aircraft. None of them mean anything is wrong with the airplane, and all of them are things pilots forecast and plan for every day.</p>
 
 <h2>The four things that cause bumps</h2>
 <p>The first is convective, or thermal, turbulence. On warm days {cite("nws_turb", "the sun heats the ground unevenly and sends up rising columns of air, which on a hot afternoon can build into thunderstorms")}. This is the bumpiness of a summer climb out.</p>
@@ -216,7 +216,7 @@ P3_FAQ = [
     {"q": "What does the jet stream have to do with turbulence?",
      "a": "The jet stream is a fast river of high altitude wind, and clear air turbulence is often found near it where fast and slow air meet. Pilots know where the jet stream is and can often change altitude to find smoother air above or below the roughest layer."},
     {"q": "How do pilots know where turbulence is?",
-     "a": "They use automated forecasts like the Graphical Turbulence Guidance, official advisories called SIGMETs and AIRMETs, and real time reports from aircraft flying ahead of them. Together these let a crew plan around the worst air before you ever feel it."},
+     "a": "They use automated forecasts like the Graphical Turbulence Guidance, official advisories called SIGMETs and AIRMETs, and real time reports from aircraft flying ahead of them. Together these let a crew find the smoothest ride and prepare for the bumpier air before you ever feel it."},
     {"q": "What do light, moderate, and severe turbulence mean?",
      "a": "They are defined by what happens inside the airplane, not by fear. In light turbulence loose objects stay at rest. In moderate you feel definite strain against your belt but the airplane is fully controlled. Severe, which is rare and brief, throws unsecured occupants against their belts. The airplane handles all of it."},
 ]
