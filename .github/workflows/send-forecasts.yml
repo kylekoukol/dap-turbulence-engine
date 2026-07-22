@@ -37,3 +37,5 @@ jobs:
           echo "HTTP $code"
           echo "Response:"; cat /tmp/resp.json; echo
           test "$code" = "200"
+
+# trigger: manual test send 2026-07-22T18:32Z
