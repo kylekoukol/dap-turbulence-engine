@@ -38,6 +38,6 @@ jobs:
         env:
           # Public app ingest route (not secret). Override via repo variable
           # INGEST_URL if you move to a custom domain later.
-          INGEST_URL: ${{ vars.INGEST_URL || 'https://dap-turbulence.lovable.app/api/ingest' }}
+          INGEST_URL: ${{ vars.INGEST_URL || 'https://dialapilot.com/api/ingest' }}
           INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
         run: python run.py
