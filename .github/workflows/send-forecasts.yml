@@ -25,11 +25,11 @@ jobs:
     steps:
       - name: Process the day-before queue
         env:
-          APP_URL: ${{ vars.APP_URL || 'https://dap-turbulence.lovable.app' }}
+          APP_URL: ${{ vars.APP_URL || 'https://dialapilot.com' }}
           INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
         run: |
           echo "Calling send-forecast-emails..."
-          code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" \
+          code=$(curl -sSL -o /tmp/resp.json -w "%{http_code}" \
             -X POST "$APP_URL/api/send-forecast-emails" \
             -H "x-ingest-secret: $INGEST_SECRET" \
             -H "Content-Type: application/json" \
