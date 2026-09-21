@@ -80,7 +80,7 @@ What ends up in Supabase (the read seam the app + a future iOS app consume):
 ## Coverage
 
 CONUS-precise (DAFS GTG is CONUS-only). The route function degrades honestly
-over ocean/international, where EDR has no coverage.
+over ocean/international, where EDR has no coverage. 
 
 ## v1 scope / fast-follow
 
