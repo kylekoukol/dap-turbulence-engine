@@ -40,4 +40,7 @@ jobs:
           # INGEST_URL if you move to a custom domain later.
           INGEST_URL: ${{ vars.INGEST_URL || 'https://dialapilot.com/api/ingest' }}
           INGEST_SECRET: ${{ secrets.INGEST_SECRET }}
+          # Optional second copy to the Dial A Pilot app backend. Unset = not used.
+          APP_INGEST_URL: ${{ vars.APP_INGEST_URL }}
+          APP_INGEST_SECRET: ${{ secrets.APP_INGEST_SECRET }}
         run: python run.py
